@@ -14,10 +14,9 @@ import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.begentgroup.xmlparser.XMLParser;
+import com.google.gson.Gson;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -54,42 +53,29 @@ public class MainActivity extends AppCompatActivity {
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                new MyMelonJsonTask().execute();
+                new MyMelonXMLTask().execute();
             }
         });
     }
 
-    String urlFormat = " http://apis.skplanetx.com/melon/charts/realtime?count=%s&page=%s&version=1";
+    String urlFormat = "http://apis.skplanetx.com/melon/charts/realtime?count=%s&page=%s&version=1";
 
-    class MyMelonJsonTask extends AsyncTask<String,Integer, Melon> {
+    class MyMelonXMLTask extends AsyncTask<String, Integer, Melon>{
         @Override
         protected Melon doInBackground(String... params) {
             String urlText = String.format(urlFormat, 10, 1);
             try {
                 URL url = new URL(urlText);
                 HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-                conn.setRequestProperty("Accept","application/json");
+                conn.setRequestProperty("Accept","application/xml");
                 conn.setRequestProperty("appKey","458a10f5-c07e-34b5-b2bd-4a891e024c2a");
                 int code = conn.getResponseCode();
                 if (code >= HttpURLConnection.HTTP_OK && code < HttpURLConnection.HTTP_MULT_CHOICE) {
-                    StringBuilder sb = new StringBuilder();
+
                     InputStream is = conn.getInputStream();
-                    BufferedReader br = new BufferedReader(new InputStreamReader(is));
-                    String line;
-                    while((line=br.readLine()) != null) {
-                        sb.append(line).append("\n\r");
-                    }
-                    String text = sb.toString();
-
-                    try {
-                        JSONObject jobject = new JSONObject(text);
-                        MelonData data = new MelonData();
-                        data.setData(jobject);
-                        return data.melon;
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-
+                    XMLParser parser = new XMLParser();
+                    Melon melon = parser.fromXml(is, "melon", Melon.class);
+                    return melon;
                 }
             } catch (MalformedURLException e) {
                 e.printStackTrace();
@@ -103,7 +89,63 @@ public class MainActivity extends AppCompatActivity {
         protected void onPostExecute(Melon melon) {
             super.onPostExecute(melon);
             if (melon != null) {
-                for (Song s : melon.songs.song) {
+                for (Song s : melon.songs.songlist) {
+                    mAdapter.add(s);
+                }
+            } else {
+                Toast.makeText(MainActivity.this, "Error!!!", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    class MyMelonJsonTask extends AsyncTask<String,Integer, Melon> {
+        @Override
+        protected Melon doInBackground(String... params) {
+            String urlText = String.format(urlFormat, 10, 1);
+            try {
+                URL url = new URL(urlText);
+                HttpURLConnection conn = (HttpURLConnection)url.openConnection();
+                conn.setRequestProperty("Accept","application/json");
+                conn.setRequestProperty("appKey","458a10f5-c07e-34b5-b2bd-4a891e024c2a");
+                int code = conn.getResponseCode();
+                if (code >= HttpURLConnection.HTTP_OK && code < HttpURLConnection.HTTP_MULT_CHOICE) {
+//                    StringBuilder sb = new StringBuilder();
+//                    InputStream is = conn.getInputStream();
+//                    BufferedReader br = new BufferedReader(new InputStreamReader(is));
+//                    String line;
+//                    while((line=br.readLine()) != null) {
+//                        sb.append(line).append("\n\r");
+//                    }
+//                    String text = sb.toString();
+//
+//                    try {
+//                        JSONObject jobject = new JSONObject(text);
+//                        MelonData data = new MelonData();
+//                        data.setData(jobject);
+//                        return data.melon;
+//                    } catch (JSONException e) {
+//                        e.printStackTrace();
+//                    }
+
+                    Gson gson = new Gson();
+                    InputStream is = conn.getInputStream();
+                    InputStreamReader isr = new InputStreamReader(is);
+                    MelonData data = gson.fromJson(isr, MelonData.class);
+                    return data.melon;
+                }
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Melon melon) {
+            super.onPostExecute(melon);
+            if (melon != null) {
+                for (Song s : melon.songs.songlist) {
                     mAdapter.add(s);
                 }
             } else {
