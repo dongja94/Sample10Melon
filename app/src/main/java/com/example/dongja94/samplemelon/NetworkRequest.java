@@ -34,13 +34,13 @@ public abstract class NetworkRequest<T> implements Runnable {
     }
 
     void sendSuccess() {
-        if (mResultListener != null) {
+        if (mResultListener != null && !isCancel) {
             mResultListener.onSuccess(this, result);
         }
     }
 
     void sendFailure() {
-        if (mResultListener != null) {
+        if (mResultListener != null && !isCancel) {
             mResultListener.onFailure(this, errorCode, responseCode, responseMessage, errorThrowable);
         }
     }
@@ -73,48 +73,97 @@ public abstract class NetworkRequest<T> implements Runnable {
 
     abstract protected T parse(InputStream is) throws ParseException;
 
+    public static final int DEFAULT_RETRY_COUNT = 3;
+    private int retryCount = DEFAULT_RETRY_COUNT;
+
+    private boolean isCancel = false;
+    public void cancel() {
+        isCancel = true;
+        if (mConn != null) {
+            mConn.disconnect();
+        }
+        manager.postCancelProcess(this);
+    }
+
+    public boolean isCancel() {
+        return isCancel;
+    }
+
+    HttpURLConnection mConn = null;
+
     @Override
     public void run() {
-        try {
-            URL url = getURL();
-            HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-            String method = getRequestMethod();
-            if (method == METHOD_POST || method == METHOD_PUT) {
-                conn.setDoOutput(true);
-            }
-            conn.setRequestMethod(method);
-            setRequestHeader(conn);
-            setConfiguration(conn);
-            conn.setConnectTimeout(getTimeout());
-            conn.setReadTimeout(getTimeout());
-            if (conn.getDoOutput()) {
-                OutputStream out = conn.getOutputStream();
-                setOutput(out);
-            }
+        while(retryCount > 0 && !isCancel) {
+            try {
+                URL url = getURL();
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                String method = getRequestMethod();
+                if (method == METHOD_POST || method == METHOD_PUT) {
+                    conn.setDoOutput(true);
+                }
+                conn.setRequestMethod(method);
+                setRequestHeader(conn);
+                setConfiguration(conn);
+                conn.setConnectTimeout(getTimeout());
+                conn.setReadTimeout(getTimeout());
+                if (isCancel) {
+                    return;
+                }
+                if (conn.getDoOutput()) {
+                    OutputStream out = conn.getOutputStream();
+                    setOutput(out);
+                }
 
-            int code = conn.getResponseCode();
-            if (code >= HttpURLConnection.HTTP_OK && code < HttpURLConnection.HTTP_MULT_CHOICE) {
-                InputStream is = conn.getInputStream();
-                result = parse(is);
-                manager.sendSuccess(this);
-                return;
+                if (isCancel) {
+                    return;
+                }
+
+                int code = conn.getResponseCode();
+
+                if (isCancel) {
+                    return;
+                }
+                if (code >= HttpURLConnection.HTTP_OK && code < HttpURLConnection.HTTP_MULT_CHOICE) {
+                    mConn = conn;
+                    InputStream is = conn.getInputStream();
+                    result = parse(is);
+                    if (isCancel) {
+                        return;
+                    }
+                    manager.sendSuccess(this);
+                    return;
+                }
+                responseCode = code;
+                responseMessage = conn.getResponseMessage();
+                errorCode = ERROR_CODE_HTTP;
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+                errorThrowable = e;
+                errorCode = ERROR_CODE_NETWORK;
+            } catch (IOException e) {
+                e.printStackTrace();
+                errorThrowable = e;
+                errorCode = ERROR_CODE_NETWORK;
+                retryCount--;
+                continue;
+            } catch (ParseException e) {
+                e.printStackTrace();
+                errorThrowable = e;
+                errorCode = ERROR_CODE_PARSE;
             }
-            responseCode = code;
-            responseMessage = conn.getResponseMessage();
-            errorCode = ERROR_CODE_HTTP;
-        } catch (MalformedURLException e) {
-            e.printStackTrace();
-            errorThrowable = e;
-            errorCode = ERROR_CODE_NETWORK;
-        } catch (IOException e) {
-            e.printStackTrace();
-            errorThrowable = e;
-            errorCode = ERROR_CODE_NETWORK;
-        } catch (ParseException e) {
-            e.printStackTrace();
-            errorThrowable = e;
-            errorCode = ERROR_CODE_PARSE;
+            retryCount = 0;
         }
-        manager.sendFailure(this);
+        if (!isCancel) {
+            manager.sendFailure(this);
+        }
     }
+
+    Object tag = null;
+    public void setTag(Object tag) {
+        this.tag = tag;
+    }
+    public Object getTag() {
+        return tag;
+    }
+
 }

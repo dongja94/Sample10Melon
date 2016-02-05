@@ -78,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
                 if (!TextUtils.isEmpty(keyword)) {
                     try {
                         MelonSongSearchRequest request = new MelonSongSearchRequest(keyword);
+                        request.setTag(MainActivity.this);
                         NetworkManager.getInstance().getNetworkData(request, new NetworkManager.OnResultListener<Melon>() {
                             @Override
                             public void onSuccess(NetworkRequest<Melon> request, Melon result) {
@@ -97,6 +98,12 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        NetworkManager.getInstance().cancelAll(this);
     }
 
     String urlFormat = "http://apis.skplanetx.com/melon/charts/realtime?count=%s&page=%s&version=1";
