@@ -92,10 +92,15 @@ public class NetworkManager {
     }
 
     public void cancelAll(Object tag) {
+        List<NetworkRequest> removeList = new ArrayList<NetworkRequest>();
         for (NetworkRequest r : mRequestList) {
             if (tag == null || r.getTag().equals(tag)) {
-                r.cancel();
+                removeList.add(r);
             }
+        }
+
+        for (NetworkRequest r : removeList) {
+            r.cancel();
         }
     }
 }
