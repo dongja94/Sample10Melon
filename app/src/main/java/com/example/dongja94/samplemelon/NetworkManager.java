@@ -34,7 +34,15 @@ public class NetworkManager {
     private static final int MESSAGE_SUCCESS = 0;
     private static final int MESSAGE_FAILURE = 1;
 
-    Handler mHandler = new Handler(Looper.getMainLooper()) {
+    static class NetworkHandler extends  Handler {
+        public NetworkHandler() {
+            super();
+        }
+
+        public NetworkHandler(Looper looper) {
+            super(looper);
+        }
+
         @Override
         public void handleMessage(Message msg) {
             NetworkRequest r = (NetworkRequest)msg.obj;
@@ -47,7 +55,9 @@ public class NetworkManager {
                     break;
             }
         }
-    };
+    }
+
+    Handler mHandler = new NetworkHandler(Looper.getMainLooper());
 
     public void sendSuccess(NetworkRequest request) {
         Message msg = mHandler.obtainMessage(MESSAGE_SUCCESS, request);
