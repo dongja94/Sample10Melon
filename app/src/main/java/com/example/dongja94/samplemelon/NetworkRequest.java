@@ -17,7 +17,40 @@ public abstract class NetworkRequest<T> implements Runnable {
     public static final String METHOD_PUT = "PUT";
     public static final String METHOD_DELETE = "DELETE";
 
+    public static final int ERROR_CODE_NETWORK = -1;
+    public static final int ERROR_CODE_PARSE = -2;
+    public static final int ERROR_CODE_HTTP = -3;
+    public static final int ERROR_UNKNOWN = 0;
+
+    NetworkManager.OnResultListener<T> mResultListener;
+    NetworkManager manager;
+
+    void setManager(NetworkManager manager) {
+        this.manager = manager;
+    }
+
+    public void setOnResultListener(NetworkManager.OnResultListener<T> listener) {
+        mResultListener = listener;
+    }
+
+    void sendSuccess() {
+        if (mResultListener != null) {
+            mResultListener.onSuccess(this, result);
+        }
+    }
+
+    void sendFailure() {
+        if (mResultListener != null) {
+            mResultListener.onFailure(this, errorCode, responseCode, responseMessage, errorThrowable);
+        }
+    }
+
     T result;
+    int errorCode;
+    int responseCode;
+    String responseMessage;
+    Throwable errorThrowable;
+
     public abstract URL getURL() throws MalformedURLException;
     public String getRequestMethod() {
         return METHOD_GET;
@@ -38,7 +71,7 @@ public abstract class NetworkRequest<T> implements Runnable {
 
     }
 
-    abstract protected T parse(InputStream is);
+    abstract protected T parse(InputStream is) throws ParseException;
 
     @Override
     public void run() {
@@ -52,22 +85,36 @@ public abstract class NetworkRequest<T> implements Runnable {
             conn.setRequestMethod(method);
             setRequestHeader(conn);
             setConfiguration(conn);
+            conn.setConnectTimeout(getTimeout());
+            conn.setReadTimeout(getTimeout());
             if (conn.getDoOutput()) {
                 OutputStream out = conn.getOutputStream();
                 setOutput(out);
             }
-            conn.setConnectTimeout(getTimeout());
-            conn.setReadTimeout(getTimeout());
 
             int code = conn.getResponseCode();
             if (code >= HttpURLConnection.HTTP_OK && code < HttpURLConnection.HTTP_MULT_CHOICE) {
                 InputStream is = conn.getInputStream();
                 result = parse(is);
+                manager.sendSuccess(this);
+                return;
             }
+            responseCode = code;
+            responseMessage = conn.getResponseMessage();
+            errorCode = ERROR_CODE_HTTP;
         } catch (MalformedURLException e) {
             e.printStackTrace();
+            errorThrowable = e;
+            errorCode = ERROR_CODE_NETWORK;
         } catch (IOException e) {
             e.printStackTrace();
+            errorThrowable = e;
+            errorCode = ERROR_CODE_NETWORK;
+        } catch (ParseException e) {
+            e.printStackTrace();
+            errorThrowable = e;
+            errorCode = ERROR_CODE_PARSE;
         }
+        manager.sendFailure(this);
     }
 }

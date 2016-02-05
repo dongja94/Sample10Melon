@@ -6,11 +6,13 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
 
@@ -20,6 +22,7 @@ import com.google.gson.Gson;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -27,6 +30,7 @@ import java.net.URL;
 public class MainActivity extends AppCompatActivity {
 
     ListView listView;
+    EditText keywordView;
     ArrayAdapter<Song> mAdapter;
 
     @Override
@@ -45,30 +49,67 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        listView = (ListView)findViewById(R.id.listView);
+        keywordView = (EditText) findViewById(R.id.edit_keyword);
+        listView = (ListView) findViewById(R.id.listView);
         mAdapter = new ArrayAdapter<Song>(this, android.R.layout.simple_list_item_1);
         listView.setAdapter(mAdapter);
 
-        Button btn = (Button)findViewById(R.id.btn_json_melon);
+        Button btn = (Button) findViewById(R.id.btn_json_melon);
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                new MyMelonXMLTask().execute();
+//                new MyMelonXMLTask().execute();
+//                MelonRequest request = new MelonRequest(2, 10);
+//                NetworkManager.getInstance().getNetworkData(request, new NetworkManager.OnResultListener<Melon>() {
+//                    @Override
+//                    public void onSuccess(NetworkRequest<Melon> request, Melon result) {
+//                        for (Song s : result.songs.songlist) {
+//                            mAdapter.add(s);
+//                        }
+//                    }
+//
+//                    @Override
+//                    public void onFailure(NetworkRequest<Melon> request, int errorCode, int responseCode, String message, Throwable excepton) {
+//                        Toast.makeText(MainActivity.this, "Failure", Toast.LENGTH_SHORT).show();
+//                    }
+//                });
+
+                String keyword = keywordView.getText().toString();
+                if (!TextUtils.isEmpty(keyword)) {
+                    try {
+                        MelonSongSearchRequest request = new MelonSongSearchRequest(keyword);
+                        NetworkManager.getInstance().getNetworkData(request, new NetworkManager.OnResultListener<Melon>() {
+                            @Override
+                            public void onSuccess(NetworkRequest<Melon> request, Melon result) {
+                                for (Song s : result.songs.songlist) {
+                                    mAdapter.add(s);
+                                }
+                            }
+
+                            @Override
+                            public void onFailure(NetworkRequest<Melon> request, int errorCode, int responseCode, String message, Throwable excepton) {
+                                Toast.makeText(MainActivity.this, "Failure", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         });
     }
 
     String urlFormat = "http://apis.skplanetx.com/melon/charts/realtime?count=%s&page=%s&version=1";
 
-    class MyMelonXMLTask extends AsyncTask<String, Integer, Melon>{
+    class MyMelonXMLTask extends AsyncTask<String, Integer, Melon> {
         @Override
         protected Melon doInBackground(String... params) {
             String urlText = String.format(urlFormat, 10, 1);
             try {
                 URL url = new URL(urlText);
-                HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-                conn.setRequestProperty("Accept","application/xml");
-                conn.setRequestProperty("appKey","458a10f5-c07e-34b5-b2bd-4a891e024c2a");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestProperty("Accept", "application/xml");
+                conn.setRequestProperty("appKey", "458a10f5-c07e-34b5-b2bd-4a891e024c2a");
                 int code = conn.getResponseCode();
                 if (code >= HttpURLConnection.HTTP_OK && code < HttpURLConnection.HTTP_MULT_CHOICE) {
 
@@ -98,15 +139,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    class MyMelonJsonTask extends AsyncTask<String,Integer, Melon> {
+    class MyMelonJsonTask extends AsyncTask<String, Integer, Melon> {
         @Override
         protected Melon doInBackground(String... params) {
             String urlText = String.format(urlFormat, 10, 1);
             try {
                 URL url = new URL(urlText);
-                HttpURLConnection conn = (HttpURLConnection)url.openConnection();
-                conn.setRequestProperty("Accept","application/json");
-                conn.setRequestProperty("appKey","458a10f5-c07e-34b5-b2bd-4a891e024c2a");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestProperty("Accept", "application/json");
+                conn.setRequestProperty("appKey", "458a10f5-c07e-34b5-b2bd-4a891e024c2a");
                 int code = conn.getResponseCode();
                 if (code >= HttpURLConnection.HTTP_OK && code < HttpURLConnection.HTTP_MULT_CHOICE) {
 //                    StringBuilder sb = new StringBuilder();

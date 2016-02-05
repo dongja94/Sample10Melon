@@ -1,5 +1,9 @@
 package com.example.dongja94.samplemelon;
 
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -27,7 +31,37 @@ public class NetworkManager {
         public void onFailure(NetworkRequest<T> request, int errorCode, int responseCode, String message, Throwable excepton);
     }
 
+    private static final int MESSAGE_SUCCESS = 0;
+    private static final int MESSAGE_FAILURE = 1;
+
+    Handler mHandler = new Handler(Looper.getMainLooper()) {
+        @Override
+        public void handleMessage(Message msg) {
+            NetworkRequest r = (NetworkRequest)msg.obj;
+            switch (msg.what) {
+                case MESSAGE_SUCCESS :
+                    r.sendSuccess();
+                    break;
+                case MESSAGE_FAILURE :
+                    r.sendFailure();
+                    break;
+            }
+        }
+    };
+
+    public void sendSuccess(NetworkRequest request) {
+        Message msg = mHandler.obtainMessage(MESSAGE_SUCCESS, request);
+        mHandler.sendMessage(msg);
+    }
+
+    public void sendFailure(NetworkRequest request) {
+        Message msg = mHandler.obtainMessage(MESSAGE_FAILURE, request);
+        mHandler.sendMessage(msg);
+    }
+
     public <T> void getNetworkData(NetworkRequest<T> request, OnResultListener<T> listener){
+        request.setManager(this);
+        request.setOnResultListener(listener);
         mExecutor.execute(request);
     }
 }
